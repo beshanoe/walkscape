@@ -1,5 +1,7 @@
 # WalkScape
 
+<img width="1313" height="732" alt="Untitled" src="https://github.com/user-attachments/assets/95a7bb29-67b3-47a7-acf8-f1616c3abbd0" />
+
 A macOS app that puts you on a walk during video calls. It runs **Apple's own Video
 Effects engine** (the one behind Control Center → Video Effects → Background) inside the app
 and feeds it a **moving** background rendered with Metal, walking at your speed: an endless
