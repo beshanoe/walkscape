@@ -18,6 +18,14 @@ cd "$(dirname "$0")"
 mkdir -p build/obj
 
 MIN_MACOS=15.0
+# The version, MAJOR.MINOR.PATCH, is bundle/Info.plist's CFBundleShortVersionString and nothing
+# else (AGENTS.md → "Finishing a feature"): CFBundleVersion, which macOS compares, is
+# set to the same string below.
+VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' bundle/Info.plist)
+if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "bundle/Info.plist: the version \"$VERSION\" isn't MAJOR.MINOR.PATCH" >&2
+  exit 1
+fi
 DIRS=$(find src -type d | sort)
 DUPLICATES=$(find src -type f -exec basename {} \; | sort | uniq -d)
 if [ -n "$DUPLICATES" ]; then
@@ -134,21 +142,20 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$EXT/Contents/MacOS"
 swiftc $SWIFTFLAGS -import-objc-header src/app/WalkScape-Bridging.h $SWIFT $OBJ $FRAMEWORKS \
   -o "$APP/Contents/MacOS/WalkScape"
 cp bundle/Info.plist "$APP/Contents/Info.plist"
-# Build number (CFBundleVersion): the git commit count, so every shared build is distinct.
-BUILD_NUMBER=${BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $VERSION" "$APP/Contents/Info.plist"
 cp resources/AppIcon.icns "$APP/Contents/Resources/"  # from tools/make-icon.swift
 
-# macOS replaces an installed extension only when its version differs, and often starts a replaced
-# camera extension only after a restart. So the version follows the extension's own sources: it
-# changes when they do, not on every build.
-VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' bundle/Info.plist)
+# macOS replaces an installed extension when either of its versions differs, and often starts a
+# replaced camera extension only after a restart. So the extension's versions follow its own
+# sources, not the app's: CFBundleVersion changes when they do, and CFBundleShortVersionString
+# stays 0.1 (the app's version when the two parted; changing it would swap the extension in too).
+EXT_VERSION=0.1
 # These four files in this order: another list or order changes the version, and macOS swaps in
 # the extension (on 27.2 it then stayed stopped until a restart).
 EXT_SUM=$(cat $EXT_DIR/CameraExtension.m src/virtual-camera/VirtualCameraShared.h $EXT_DIR/CameraExtension-Info.plist $EXT_DIR/CameraExtension.entitlements | cksum | cut -d' ' -f1)
-BUILD="1.$((EXT_SUM % 2147483647))"  # not the app's build number: that changes every commit
+BUILD="1.$((EXT_SUM % 2147483647))"
 cp build/camera-extension "$EXT/Contents/MacOS/$EXT_ID"
-sed -e "s/@TEAM_ID@/$TEAM_ID/g" -e "s/@VERSION@/$VERSION/g" -e "s/@BUILD@/$BUILD/g" $EXT_DIR/CameraExtension-Info.plist > "$EXT/Contents/Info.plist"
+sed -e "s/@TEAM_ID@/$TEAM_ID/g" -e "s/@VERSION@/$EXT_VERSION/g" -e "s/@BUILD@/$BUILD/g" $EXT_DIR/CameraExtension-Info.plist > "$EXT/Contents/Info.plist"
 sed "s/@TEAM_ID@/$TEAM_ID/g" $EXT_DIR/CameraExtension.entitlements > build/CameraExtension.entitlements
 
 # Inside out: the extension, then the app.
@@ -170,4 +177,4 @@ else
   codesign --force --sign - "$APP" >/dev/null
   echo "signed ad hoc: the virtual camera can't be installed from this build"
 fi
-echo "built $APP ($(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' bundle/Info.plist) build $BUILD_NUMBER) build/backdrop-test build/camera-extension"
+echo "built $APP (version $VERSION) build/backdrop-test build/camera-extension"

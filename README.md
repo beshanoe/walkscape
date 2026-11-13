@@ -20,7 +20,7 @@ virtual camera, **WalkScape Camera**.
 
 ## Download
 
-Get the disk image (`WalkScape-<version>-<build>.dmg`) from the
+Get the disk image (`WalkScape-<version>.dmg`) from the
 [Releases page](https://github.com/beshanoe/walkscape/releases). It is signed with a Developer
 ID and notarized by Apple, so it opens without Gatekeeper warnings.
 
@@ -58,10 +58,16 @@ To remove the virtual camera: **WalkScape → Remove Virtual Camera…** (or del
 The settings are in a panel on the right (**View → Hide/Show Settings**, ⌥⌘I; drag its edge to
 resize). Values are saved between launches.
 
+- At the top, the version (and **Update Available** when there's a newer one; see "Updates").
 - **Camera**: which camera (remembered, and used whenever it's connected), and whether the
   preview is mirrored.
 - **Virtual camera**: whether other apps can use the picture, with the one button that's needed
   next (**Install Virtual Camera**, **Open System Settings**).
+- **Webcam position** makes the scene's camera match your real one (it sits with
+  the camera because another camera usually means another position): **Height above floor** (the
+  lens height above the floor you stand on, the treadmill deck), **Tilt (up)** from −30° to 60°
+  (laptop webcams usually look up 5–15°; over a laptop with its lid opened to 45°, about 45°),
+  and **Field of view** (the webcam's horizontal angle).
 - **Show**: **Both** (you in front of the background, the normal mode), **Camera** (the raw
   camera, to compare) or **Background** (the background alone).
 - **Walk and picture**: **Speed**; **Blur** (how soft distant things are, like a lens focused on
@@ -69,10 +75,6 @@ resize). Values are saved between launches.
   noise measured in your camera's picture (1× matches it); **Match the webcam**, how far the
   background takes on your camera's look (brightness, the colour of your room's light, black
   and white levels, a webcam lens's slight distortion and colour fringes; 0 turns it off).
-- **Webcam position** makes the scene's camera match your real one: **Height above floor** (the
-  lens height above the floor you stand on, the treadmill deck), **Tilt (up)** from −30° to 60°
-  (laptop webcams usually look up 5–15°; over a laptop with its lid opened to 45°, about 45°),
-  and **Field of view** (the webcam's horizontal angle).
 - **Scene**: **Forest road** (default), **Mountain trail**, **Medieval street**, **Paris
   street**, **Seaside promenade**, **Corridor**, or **Video**: **Select Video…** picks a file
   (also ⌘O, or drag a video onto the window). With no video the camera shows as it is, its real
@@ -91,6 +93,15 @@ resize). Values are saved between launches.
 
 If the system's own Video Effects are on for WalkScape, a warning at the top of the panel says
 so: they run before frames reach the app, so they would stack with this one.
+
+### Updates
+
+At launch and then once a day, WalkScape asks GitHub for the latest release of
+[beshanoe/walkscape](https://github.com/beshanoe/walkscape/releases). When that release is newer,
+**Update Available** appears next to the version at the top of the panel. Click it to open the
+release page, which has what's new and the disk image. The app doesn't download or install
+anything itself. **WalkScape → Check for Updates…** checks right away and says what it found;
+**Check for Updates Automatically** turns the daily check off.
 
 ### Hidden settings
 
@@ -119,11 +130,18 @@ relaunch WalkScape (`defaults delete …` hides it again; the choices made in it
 
 ## Privacy
 
-Everything runs locally: no telemetry, no internet. The camera picture goes to the preview and
-to WalkScape Camera, for the video apps you pick it in. The only connection WalkScape makes is
-to a treadmill app on this Mac or your local network, and only when the hidden Treadmill
-setting is on and **Speed from** is **Treadmill**. The scenes are all procedural: no models,
-textures or videos are bundled or downloaded.
+Everything runs on your Mac: no account, no telemetry, and your picture never leaves it. The
+camera picture goes to the preview and to WalkScape Camera, for the video apps you pick it in.
+
+WalkScape goes online for one thing only: the update check (see "Updates"; you can turn it off).
+It is one HTTPS request to GitHub's API, with no account, cookies or identifiers: the headers are
+`Accept`, `Accept-Language: en`, and `User-Agent: WalkScape`. GitHub sees the request come from
+your IP address, as it would for any page you open. The code is `src/app/UpdateChecker.swift`.
+Logs: `log stream --predicate 'subsystem == "dev.walkscape.app" AND category == "updates"'`.
+
+The only other connection is to a treadmill app on this Mac or your local network, and only
+when the hidden Treadmill setting is on and **Speed from** is **Treadmill**. The scenes are all
+procedural: no models, textures or videos are bundled or downloaded.
 
 ## Building from source
 

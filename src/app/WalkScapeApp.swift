@@ -26,6 +26,11 @@ struct WalkScapeApp: App {
           .disabled(model.recordingClip)
       }
       CommandGroup(after: .appInfo) {
+        Button("Check for Updates…") { model.updates.checkNow() }
+          .disabled(model.updates.checking)
+        Toggle("Check for Updates Automatically", isOn: Binding(
+          get: { model.updates.automatic }, set: { model.updates.automatic = $0 }))
+        Divider()
         Button("Remove Virtual Camera…") { model.virtualCameraInstaller.uninstall() }
           .disabled(model.virtualCameraInstall != .installed && model.virtualCameraInstall != .needsApproval)
       }

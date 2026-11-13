@@ -1,5 +1,6 @@
-// The inspector panel: the app's own settings (camera, virtual camera, Show; treadmill and Cutout
-// only when Features turns them on), then the settings every scene shares
+// The inspector panel: the version (and Update Available), the app's own settings (camera, virtual
+// camera, the webcam's position, which goes with the camera, Show; treadmill and Cutout only when
+// Features turns them on), then the rest of the settings every scene shares
 // (SceneRenderer.commonParameters), then the scene picker (Video last) and the chosen scene's
 // settings. Both kinds come from SceneParameter descriptors: ParameterRow saves each
 // value in UserDefaults and applies it to the renderer.
@@ -20,6 +21,7 @@ struct SettingsPanel: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 14) {
+        versionLine
         ForEach(model.warnings, id: \.self) { warning in
           Text(warning).foregroundStyle(.orange)
         }
@@ -62,6 +64,10 @@ struct SettingsPanel: View {
         }
         Divider()
 
+        // Where the webcam is: with the camera, since a different camera means a different position.
+        commonSection(Self.webcamSection)
+        Divider()
+
         if Features.treadmill {
           treadmillSection
           Divider()
@@ -83,22 +89,9 @@ struct SettingsPanel: View {
           Divider()
         }
 
-        // Settings every scene shares (the walk, the picture, the webcam) …
-        ForEach(Self.sections(of: SceneRenderer.commonParameters), id: \.self) { section in
-          PanelSection(section) {
-            if section == "Webcam position" {
-              Text("Match your real webcam, so the scene lines up with you.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            }
-            Group {
-              // With the treadmill as the source, its speed replaces the slider.
-              ForEach(Self.common(in: section).filter { model.speedSource == .slider || $0.key != "speedKmh" }, id: \.key) { parameter in
-                ParameterRow(parameter, scene: nil, renderer: model.pipeline.scenes)
-              }
-            }
-            .disabled(model.currentScene == nil)
-          }
+        // The other settings every scene shares (the walk, the picture) …
+        ForEach(Self.sections(of: SceneRenderer.commonParameters).filter { $0 != Self.webcamSection }, id: \.self) { section in
+          commonSection(section)
           Divider()
         }
 
@@ -154,6 +147,39 @@ struct SettingsPanel: View {
           .foregroundStyle(.secondary)
       }
       .padding(16)
+    }
+  }
+
+  /// The version, and Update Available when a newer release is out (UpdateChecker).
+  private var versionLine: some View {
+    HStack(alignment: .firstTextBaseline) {
+      Text("Version \(model.updates.currentVersion)")
+        .foregroundStyle(.secondary)
+      Spacer()
+      if let version = model.updates.available {
+        Button("Update Available") { model.updates.openReleasePage() }
+          .buttonStyle(.link)
+          .help("WalkScape \(version) is out: opens its release page")
+      }
+    }
+    .font(.subheadline)
+  }
+
+  /// One section of the settings every scene shares (SceneRenderer.commonParameters).
+  private func commonSection(_ section: String) -> some View {
+    PanelSection(section) {
+      if section == Self.webcamSection {
+        Text("Match your real webcam, so the scene lines up with you.")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+      }
+      Group {
+        // With the treadmill as the source, its speed replaces the slider.
+        ForEach(Self.common(in: section).filter { model.speedSource == .slider || $0.key != "speedKmh" }, id: \.key) { parameter in
+          ParameterRow(parameter, scene: nil, renderer: model.pipeline.scenes)
+        }
+      }
+      .disabled(model.currentScene == nil)
     }
   }
 
@@ -216,6 +242,8 @@ struct SettingsPanel: View {
 }
 
 extension SettingsPanel {
+  fileprivate static let webcamSection = "Webcam position"
+
   /// The renderer's own settings in one section.
   fileprivate static func common(in section: String) -> [SceneParameter] {
     SceneRenderer.commonParameters.filter { $0.section == section }

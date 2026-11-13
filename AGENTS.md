@@ -10,8 +10,11 @@ User-facing docs: `README.md`. Apple internals and how to re-check them: `docs/a
 
 ## Ground rules
 
-- **Everything runs locally**: no telemetry, no internet, no cloud services. The one connection
-  is to a treadmill source (DirCon) on this Mac or the local network, while Speed from = Treadmill.
+- **Everything runs locally**: no telemetry, no cloud services, the picture never leaves the Mac.
+  Two connections only: the **update check** (one GET of the latest GitHub release, at launch and
+  daily, on by default, WalkScape → Check for Updates Automatically turns it off) and a treadmill
+  source (DirCon) on this Mac or the local network, while Speed from = Treadmill. Nothing else
+  goes online.
 - **Private API**: Portrait.framework is undocumented. Reach it only through `src/cutout/apple/` (`PTPrivate.h`) and
   `NSClassFromString`, and fail with an error (never crash) when a class, selector or ivar is
   missing. Never on the Mac App Store (guideline 2.5.1).
@@ -24,7 +27,7 @@ works anywhere and file names stay unique across `src/` (the build checks).
 
 | Path                       | What                                                                 |
 | -------------------------- | -------------------------------------------------------------------- |
-| `src/app/`                 | SwiftUI: `WalkScapeApp` (window, menus, snapshot mode), `ContentView` (preview + inspector), `SettingsPanel` (rows built from `SceneParameter`s), `AppModel` (UI state, pushed to `Pipeline`), `Features` (flags for hidden UI), `WalkScape-Bridging.h` (the Objective-C Swift sees) |
+| `src/app/`                 | SwiftUI: `WalkScapeApp` (window, menus, snapshot mode), `ContentView` (preview + inspector), `SettingsPanel` (version line, rows built from `SceneParameter`s), `AppModel` (UI state, pushed to `Pipeline`), `UpdateChecker` (latest GitHub release vs this version), `Features` (flags for hidden UI), `WalkScape-Bridging.h` (the Objective-C Swift sees) |
 | `src/pipeline/`            | Frame plumbing: `Pipeline` (camera → background → cutout engine → `AVSampleBufferDisplayLayer` + virtual camera), `CameraSource` (AVCaptureSession, 420v, ≤ 1080p, 30 fps), `FrameLog` (per-frame diagnostics of the live path, `-frameTimingLog`), `VideoSources` (looping AVPlayer, frame-exact AVAssetReader), `FrameUtil` (pixel buffer pools, VTPixelTransferSession conversion, PNG out, `FUMeasureCamera`), `ShaderFiles` (the embedded Metal sources) |
 | `src/cutout/`              | `BackdropRendering.h`: what an engine does. `apple/`: `BackdropEngine` (`PTEffect` wrapper, the cross-fade ivar patch) and `PTPrivate.h`, **the only private-API code**. `vision/`: the Vision cutout (public API): `VisionBackdropEngine` (Vision request, crop placement), `VisionBackdrop.metal` (guided filter, spill correction, composite), `VisionBackdropShared.h` (params struct) |
 | `src/virtual-camera/`      | `VirtualCamera` (app side: installer `OSSystemExtensionRequest`, sink client, CMIO C API), `VirtualCameraShared.h` (bundle IDs, device/stream UUIDs, the 1920×1080 420v 30 fps format). `extension/`: the camera extension (its own sandboxed process): `CameraExtension.m` (device, source + sink streams, "waiting" card) and its `Info.plist`/entitlements templates (`build.sh` fills in `@TEAM_ID@`, versions) |
@@ -109,6 +112,8 @@ another WalkScape running). GPU times are noisy
   saved settings. The PNG is the whole window (title bar included) as the window server draws
   it; if that capture fails it falls back to AppKit drawing, which misses vibrancy (grey labels,
   popup and slider chrome, check marks), so don't read those as bugs in a 1440-px-tall PNG.
+  `WALKSCAPE_LATEST_RELEASE=v9.9.9` (with or without the snapshot) pretends that's the latest
+  release, without going online: Update Available shows.
 - The live camera path can't be checked headless (no camera access from the shell). Say so
   instead of claiming it works; ask the person you work with to look. But the app itself may use the camera, and
   it can log what happens: `open -n build/WalkScape.app --args -camera <uniqueID> -frameTimingLog
@@ -138,7 +143,11 @@ another WalkScape running). GPU times are noisy
 2. Work on a branch of its own, one topic per branch, and open a pull request that says what was
    checked (before/after PNGs for visual changes).
 
-Releases are made by the maintainer. Don't bump versions or build numbers in a pull request.
+Releases are made by the maintainer. Don't bump versions in a pull request. Versions are
+semantic, `MAJOR.MINOR.PATCH`, only in `bundle/Info.plist`'s `CFBundleShortVersionString`
+(`build.sh` copies it to `CFBundleVersion`); releases are tagged `v<version>` (the first was
+`v0.1-43`). The camera extension's versions are its own (`build.sh`: `EXT_VERSION`, `EXT_SUM`),
+so app versions don't swap the extension in.
 
 ## Code notes
 
@@ -329,8 +338,9 @@ Releases are made by the maintainer. Don't bump versions or build numbers in a p
   its callee, so a big function (reflections) called from ten places doubled the GPU time: call
   heavy functions once per fragment and split übershaders with function constants.
 - UI: a SwiftUI `Window` with the preview (`PreviewView`, hosting `Pipeline.displayLayer`; movie
-  files can be dropped on it) and `.inspector` holding `SettingsPanel`. Panel order: app settings
-  (camera, virtual camera, treadmill, Show, Cutout), then the settings every scene shares, then
+  files can be dropped on it) and `.inspector` holding `SettingsPanel`. Panel order: the version
+  line, app settings (camera, virtual camera, **Webcam position** (a common setting, but it goes
+  with the camera), treadmill, Show, Cutout), then the other settings every scene shares, then
   the scene picker and the scene's own sections. It should look like a finished product, so
   features not yet proven are hidden behind `Features` flags: **Treadmill** and **Cutout**
   (`Features.swift`: defaults keys `featureTreadmill`, `featureCutoutSwitch`, read at launch);
@@ -352,6 +362,12 @@ Releases are made by the maintainer. Don't bump versions or build numbers in a p
   Swift. Don't give `Slider` a `step:` (it draws a tick per step); `ParameterRow` rounds.
   The **Show** switch (`ViewMode`, key `viewMode`) picks Both (effect), Camera (raw) or
   Background (the background buffer displayed as is). Panel visibility: key `showSettings`.
+  The title bar is just "WalkScape": no subtitle, no toolbar. The panel's first line is "Version x.y.z", with an
+  **Update Available** link on the right when there is one. `UpdateChecker`: `/repos/beshanoe/walkscape/releases/latest` on
+  api.github.com, ephemeral session, `User-Agent: WalkScape`, `Accept-Language: en`; at `start()`
+  and every 24 h (continuous clock); key `checkForUpdates` (default on); Check for Updates…
+  answers in an alert; the button opens `/releases/latest` in the browser. Log category
+  `updates`.
 
 ## The virtual camera in brief
 

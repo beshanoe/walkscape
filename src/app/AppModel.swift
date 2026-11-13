@@ -108,6 +108,10 @@ final class AppModel {
   private let treadmillBrowser = TreadmillBrowser()
   private var started = false
 
+  /// The version and Update Available at the top of the panel, WalkScape → Check for Updates…
+  /// (the one internet connection).
+  let updates = UpdateChecker()
+
   // Window
   var showSettings: Bool {
     didSet { UserDefaults.standard.set(showSettings, forKey: "showSettings") }
@@ -182,6 +186,7 @@ final class AppModel {
   /// Starts the camera and keeps the camera list and the system-effects warning current.
   func start() {
     started = true
+    updates.start()
     updateTreadmill()
     virtualCameraInstaller.refresh()
     refreshCameras()

@@ -18,9 +18,24 @@ struct ContentView: View {
         .inspectorColumnWidth(min: 270, ideal: 320, max: 400)
     }
     .frame(minWidth: 720)
+    // Check for Updates…'s answer.
+    .alert(model.updates.report?.title ?? "", isPresented: updateReportShown, presenting: model.updates.report) { report in
+      if report.newer {
+        Button("Open Release Page") { model.updates.openReleasePage() }
+        Button("Later", role: .cancel) {}
+      } else {
+        Button("OK", role: .cancel) {}
+      }
+    } message: { report in
+      Text(report.message)
+    }
     .fileImporter(isPresented: $model.choosingVideo, allowedContentTypes: [.movie]) { result in
       if case .success(let url) = result { model.setBackgroundVideo(url) }
     }
+  }
+
+  private var updateReportShown: Binding<Bool> {
+    Binding(get: { model.updates.report != nil }, set: { if !$0 { model.updates.report = nil } })
   }
 }
 
