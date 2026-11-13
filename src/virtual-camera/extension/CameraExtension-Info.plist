@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>WalkScape Camera</string>
+	<key>CFBundleExecutable</key>
+	<string>dev.walkscape.app.camera</string>
+	<key>CFBundleIdentifier</key>
+	<string>dev.walkscape.app.camera</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>WalkScape Camera</string>
+	<key>CFBundlePackageType</key>
+	<string>SYSX</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@BUILD@</string>
+	<key>CMIOExtension</key>
+	<dict>
+		<key>CMIOExtensionMachServiceName</key>
+		<string>@TEAM_ID@.dev.walkscape.app.camera</string>
+	</dict>
+	<key>LSMinimumSystemVersion</key>
+	<string>15.0</string>
+	<key>NSSystemExtensionUsageDescription</key>
+	<string>Lets video apps use the WalkScape picture as a camera.</string>
+</dict>
+</plist>

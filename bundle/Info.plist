@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>WalkScape</string>
+	<key>CFBundleExecutable</key>
+	<string>WalkScape</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>dev.walkscape.app</string>
+	<key>CFBundleName</key>
+	<string>WalkScape</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>15.0</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_wahoo-fitness-tnp._tcp</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>WalkScape puts a moving forest behind you. The picture stays on this Mac.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>WalkScape can walk at your treadmill’s speed. It looks for Direct Connect treadmills (QZ, Wahoo) on your local network, only when Speed from is set to Treadmill.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+</dict>
+</plist>

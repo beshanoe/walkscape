@@ -1,0 +1,8 @@
+build/
+# local media (e.g. media/sample-background.mp4, the optional demo clip)
+media/
+.DS_Store
+*.log
+signing/
+CLAUDE.local.md
+.claude/settings.local.json
