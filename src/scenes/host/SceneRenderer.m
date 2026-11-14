@@ -156,6 +156,7 @@ static simd_float4x4 CascadeMatrix(simd_float3 eye, simd_float3 fwd, simd_float3
   os_unfair_lock _cameraLock;
   FUCameraStats _camera;  // the webcam's look, eased (guarded by _cameraLock)
   BOOL _cameraMeasured;
+  double _matchIn;  // 0…1, how much of the measured match applies (matchEaseIn); frames only
   BOOL _hasPrevious;  // the last frame's camera, for motion blur
   simd_double3 _prevEye;
   simd_float3 _prevDir;
@@ -318,6 +319,15 @@ static simd_float4x4 CascadeMatrix(simd_float3 eye, simd_float3 fwd, simd_float3
   return YES;
 }
 
+- (BOOL)waitingForScene {
+  NSString *wanted = self.sceneID;
+  if (!wanted) return NO;
+  [_lock lock];
+  BOOL waiting = !_current && !_loaded[wanted] && ![wanted isEqualToString:_failedID];
+  [_lock unlock];
+  return waiting;
+}
+
 // Under _lock: switch to the wanted scene once it's loaded; start loading it otherwise.
 - (void)updateCurrentScene {
   NSString *wanted = self.sceneID;
@@ -400,7 +410,7 @@ static simd_float4x4 CascadeMatrix(simd_float3 eye, simd_float3 fwd, simd_float3
 
 /// The webcam match for this frame (display space, after tone mapping): white balance toward its
 /// cast, its black and white levels; exposure toward its brightness.
-- (void)matchCameraInto:(FrameUniforms *)u {
+- (void)matchCameraInto:(FrameUniforms *)u dt:(double)dt {
   u->matchTint = simd_make_float3(1, 1, 1);
   u->matchGain = 1;
   u->matchLift = 0;
@@ -410,6 +420,9 @@ static simd_float4x4 CascadeMatrix(simd_float3 eye, simd_float3 fwd, simd_float3
   FUCameraStats c = _camera;
   BOOL measured = _cameraMeasured;
   os_unfair_lock_unlock(&_cameraLock);
+  double ease = self.matchEaseIn;
+  _matchIn = !measured ? 0 : ease > 0 ? fmin(_matchIn + dt / ease, 1) : 1;
+  m *= _matchIn * _matchIn * (3 - 2 * _matchIn);
   if (!measured || m <= 0) return;
   u->exposure *= (float)fmin(fmax(pow(fmax(c.mean, 0.05) / 0.42, 0.5 * m), 0.7), 1.35);
   // The cast: the mid-tones' mean chroma as RGB around a mid grey (BT.709), at unit luminance.
@@ -566,7 +579,7 @@ static void Dispatch(id<MTLComputeCommandEncoder> ce, id<MTLComputePipelineState
   if ([scene respondsToSelector:@selector(adjustLighting:values:)]) [scene adjustLighting:u values:values];
   u->exposure *= (float)exp2(self.brightness);
   u->grain = (float)(self.cameraNoise * self.grain);
-  [self matchCameraInto:u];
+  [self matchCameraInto:u dt:dt];
 
   // The sun: shadow cascades, and where it is on screen (light shafts).
   simd_float3 right = simd_make_float3(view.columns[0].x, view.columns[1].x, view.columns[2].x);

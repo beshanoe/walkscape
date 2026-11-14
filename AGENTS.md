@@ -28,7 +28,7 @@ works anywhere and file names stay unique across `src/` (the build checks).
 | Path                       | What                                                                 |
 | -------------------------- | -------------------------------------------------------------------- |
 | `src/app/`                 | SwiftUI: `WalkScapeApp` (window, menus, snapshot mode), `ContentView` (preview + inspector), `SettingsPanel` (version line, rows built from `SceneParameter`s), `AppModel` (UI state, pushed to `Pipeline`), `UpdateChecker` (latest GitHub release vs this version), `Features` (flags for hidden UI), `WalkScape-Bridging.h` (the Objective-C Swift sees) |
-| `src/pipeline/`            | Frame plumbing: `Pipeline` (camera → background → cutout engine → `AVSampleBufferDisplayLayer` + virtual camera), `CameraSource` (AVCaptureSession, 420v, ≤ 1080p, 30 fps), `FrameLog` (per-frame diagnostics of the live path, `-frameTimingLog`), `VideoSources` (looping AVPlayer, frame-exact AVAssetReader), `FrameUtil` (pixel buffer pools, VTPixelTransferSession conversion, PNG out, `FUMeasureCamera`), `ShaderFiles` (the embedded Metal sources) |
+| `src/pipeline/`            | Frame plumbing: `Pipeline` (camera → background → cutout engine → `AVSampleBufferDisplayLayer` + virtual camera; the intro at launch), `CameraSource` (AVCaptureSession, 420v, ≤ 1080p, 30 fps), `FrameLog` (per-frame diagnostics of the live path, `-frameTimingLog`), `VideoSources` (looping AVPlayer, frame-exact AVAssetReader), `FrameUtil` (pixel buffer pools, VTPixelTransferSession conversion, PNG out, `FUMeasureCamera`), `ShaderFiles` (the embedded Metal sources) |
 | `src/cutout/`              | `BackdropRendering.h`: what an engine does. `apple/`: `BackdropEngine` (`PTEffect` wrapper, the cross-fade ivar patch) and `PTPrivate.h`, **the only private-API code**. `vision/`: the Vision cutout (public API): `VisionBackdropEngine` (Vision request, crop placement), `VisionBackdrop.metal` (guided filter, spill correction, composite), `VisionBackdropShared.h` (params struct) |
 | `src/virtual-camera/`      | `VirtualCamera` (app side: installer `OSSystemExtensionRequest`, sink client, CMIO C API), `VirtualCameraShared.h` (bundle IDs, device/stream UUIDs, the 1920×1080 420v 30 fps format). `extension/`: the camera extension (its own sandboxed process): `CameraExtension.m` (device, source + sink streams, "waiting" card) and its `Info.plist`/entitlements templates (`build.sh` fills in `@TEAM_ID@`, versions) |
 | `src/treadmill/`           | Treadmill speed over DirCon (FTMS over TCP): FTMS parser, `TreadmillLink` (client), `TreadmillBrowser` (Bonjour) |
@@ -108,7 +108,8 @@ another WalkScape running). GPU times are noisy
   this way. Renders are deterministic run to run.
 - **UI layout**: `WALKSCAPE_SNAPSHOT=/path/out.png build/WalkScape.app/Contents/MacOS/WalkScape`
   lays the window out off screen (no Dock icon, camera not started), saves it as a PNG and quits.
-  The camera menu says "No camera" and the preview is black in that mode. It reads the real
+  The camera menu says "No camera" and the preview shows the intro (the saved scene, once
+  compiled, with "Starting camera…"; a scene compiling slowly leaves it black). It reads the real
   saved settings. The PNG is the whole window (title bar included) as the window server draws
   it; if that capture fails it falls back to AppKit drawing, which misses vibrancy (grey labels,
   popup and slider chrome, check marks), so don't read those as bugs in a 1440-px-tall PNG.
@@ -320,6 +321,19 @@ so app versions don't swap the extension in.
   a bright patch under recessed houses); (5) noise inputs stay small (the cobbles' z wraps at 64 m;
   past ~10,000 the hash streaks). Exposure is raised 1.3× (and up to 1.8× more under clear skies):
   the lane gets a fraction of the sky's light, and a camera in it exposes for the stone.
+- Launch (the intro, 2026-11-14): a black window for seconds came from doing everything in a row
+  on the camera's first frame (scene compile, then Apple's engine, ≈ 0.2 s warm, 3.6 s in a
+  freshly built binary). Now `AppModel.init` calls `Pipeline startIntro`: a 30 fps timer on the
+  frame queue (shared with `CameraSource`, so never two frames at once) draws the background alone
+  into `introLayer`, under `displayLayer` (transparent until then). `startCamera:` loads Apple's
+  engine on another queue meanwhile (`prepareForSize:format:`, for `CameraSource
+  frameSizeForDevice:`). The camera's frames wait (`introHolds:`: the scene `waitingForScene`, or
+  that load still running) and drive the intro; the first one that can show fades
+  `displayLayer` in over 0.6 s while the intro keeps moving under it, then the intro is emptied.
+  The camera's look comes into the scene over 1 s (`matchEaseIn`; 0 in `backdrop-test`, whose
+  renders are unchanged). The stages (`PreviewStage` → `AppModel.previewStatus`) are a pill at
+  the bottom of the preview: "Loading Forest road…", "Starting camera…", "Loading Video
+  Effects…", or a camera problem. Timings: log category `preview` ("showing … after 1.23 s").
 - Grain follows the camera: `Pipeline` measures the camera every 15 frames (`FUMeasureCamera`:
   luma noise by median Laplacian, 2nd/98th percentile levels, mean, the cast of near-neutral
   pixels) into `SceneRenderer.cameraNoise` and `measuredCamera:`; the Grain setting multiplies
@@ -461,7 +475,8 @@ so app versions don't swap the extension in.
 - Developer Mode is off: lldb can't attach or load shared-cache images. `dyld_info` can't read
   shared-cache dylibs either. Use `tools/` (in-process `dlopen` + ObjC runtime + libLTO's
   disassembler).
-- `os_log` subsystem: `dev.walkscape.app` (category `engine`).
+- `os_log` subsystem: `dev.walkscape.app` (categories `engine`, `preview` (launch stages),
+  `virtual-camera`, `updates`).
 - Run Python with `python3 -I`.
 - zsh has a `log` builtin: call `/usr/bin/log show|stream`, or you get nothing back silently.
 - A WalkScape left running (e.g. one opened to try) slows `backdrop-test`: both

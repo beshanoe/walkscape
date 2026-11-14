@@ -41,6 +41,9 @@ NS_SWIFT_SENDABLE
 - (BOOL)selectScene:(NSString *)sceneID error:(NSError **)error;
 /// Why the last scene load failed, or nil.
 @property(atomic, readonly, nullable, copy) NSString *sceneError;
+/// YES while no frame can be drawn because the chosen scene is still compiling: at launch (later
+/// the previous scene stands in meanwhile). Not while a failed load stands (`sceneError`).
+@property(atomic, readonly) BOOL waitingForScene;
 
 /// A scene setting (any thread; takes effect on the next frame). Unknown keys are ignored.
 - (void)setValue:(double)value forParameter:(NSString *)key scene:(NSString *)sceneID;
@@ -68,6 +71,10 @@ NS_SWIFT_SENDABLE
 @property(atomic) double matchCamera;
 /// The webcam's picture, measured (Pipeline, every 15 frames): eased toward each new value.
 - (void)measuredCamera:(FUCameraStats)stats;
+/// Seconds over which the webcam match comes in once the camera is first measured (0, the
+/// default: at once). The app shows the background before the camera starts, so its look then
+/// moves to the camera's instead of jumping.
+@property(atomic) double matchEaseIn;
 
 /// Moves the walker to `metres`, standing (tests; the next frame starts there and speeds up).
 - (void)jumpToDistance:(double)metres;

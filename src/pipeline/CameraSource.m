@@ -26,11 +26,28 @@
                   }]];
 }
 
-- (instancetype)initWithHandler:(CameraFrameHandler)handler {
+// The presets tried, best first, and the frame size each gives.
+static const struct {
+  const AVCaptureSessionPreset *preset;
+  CGSize size;
+} kPresets[] = {
+    {&AVCaptureSessionPreset1920x1080, {1920, 1080}},
+    {&AVCaptureSessionPreset1280x720, {1280, 720}},
+    {&AVCaptureSessionPresetHigh, {0, 0}},
+};
+
++ (CGSize)frameSizeForDevice:(AVCaptureDevice *)device {
+  for (size_t i = 0; i < sizeof kPresets / sizeof kPresets[0]; i++) {
+    if ([device supportsAVCaptureSessionPreset:*kPresets[i].preset]) return kPresets[i].size;
+  }
+  return CGSizeZero;
+}
+
+- (instancetype)initWithQueue:(dispatch_queue_t)queue handler:(CameraFrameHandler)handler {
   if (!(self = [super init])) return nil;
   _handler = [handler copy];
   _sessionQueue = dispatch_queue_create("camera.session", DISPATCH_QUEUE_SERIAL);
-  _frameQueue = dispatch_queue_create("camera.frames", dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, 0));
+  _frameQueue = queue;
   return self;
 }
 
@@ -43,9 +60,9 @@
     AVCaptureDeviceInput *input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
     if (input && [session canAddInput:input]) {
       [session addInput:input];
-      for (AVCaptureSessionPreset preset in @[ AVCaptureSessionPreset1920x1080, AVCaptureSessionPreset1280x720, AVCaptureSessionPresetHigh ]) {
-        if ([session canSetSessionPreset:preset]) {
-          session.sessionPreset = preset;
+      for (size_t i = 0; i < sizeof kPresets / sizeof kPresets[0]; i++) {
+        if ([session canSetSessionPreset:*kPresets[i].preset]) {
+          session.sessionPreset = *kPresets[i].preset;
           break;
         }
       }

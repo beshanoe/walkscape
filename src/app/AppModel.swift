@@ -120,6 +120,25 @@ final class AppModel {
 
   // Status
   private(set) var stats = "Starting camera…"
+  /// How far the preview has come since launch: the background alone, then the camera's picture.
+  private(set) var previewStage: PreviewStage = .starting
+  struct PreviewStatus: Equatable {
+    var text: String
+    var problem = false
+  }
+  /// The line over the preview until the camera's picture shows.
+  var previewStatus: PreviewStatus? {
+    guard previewStage != .live else { return nil }
+    if let cameraError { return PreviewStatus(text: cameraError, problem: true) }
+    if started && cameras.isEmpty { return PreviewStatus(text: "No camera connected", problem: true) }
+    switch previewStage {
+    case .starting:
+      if mode != .camera, let scene = currentScene { return PreviewStatus(text: "Loading \(scene.title)…") }
+      return PreviewStatus(text: "Starting camera…")
+    case .loadingEffect: return PreviewStatus(text: "Loading Video Effects…")
+    default: return PreviewStatus(text: "Starting camera…")
+    }
+  }
   /// A camera clip being recorded or just saved (File → Record Camera Clip).
   private(set) var recordingClip = false
   private(set) var clipStatus: String?
@@ -165,6 +184,7 @@ final class AppModel {
     pipeline.cutout = cutout
     pipeline.statsHandler = { [weak self] stats in self?.stats = stats }
     pipeline.renderErrorHandler = { [weak self] message in self?.renderError = message }
+    pipeline.stageHandler = { [weak self] stage in self?.previewStage = stage }
     pipeline.virtualCamera.stateHandler = { [weak self] connected, problem in
       self?.virtualCameraConnected = connected
       self?.virtualCameraProblem = problem
@@ -181,6 +201,8 @@ final class AppModel {
       virtualCameraMessage = virtualCameraInstaller.message
       // Once installed, the device appears and the pipeline's output connects to it by itself.
     }
+    // The background moves from the first moment (also in a snapshot); the camera fades in.
+    pipeline.startIntro()
   }
 
   /// Starts the camera and keeps the camera list and the system-effects warning current.

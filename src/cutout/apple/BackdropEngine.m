@@ -120,6 +120,23 @@ static NSError *BackdropError(NSInteger code, NSString *message) {
   return YES;
 }
 
+- (BOOL)prepareForSize:(CGSize)size format:(OSType)format error:(NSError **)error {
+  [_lock lock];
+  BOOL ok = YES;
+  @try {
+    uint64_t types = self.effectTypes;
+    if (!_effect || !CGSizeEqualToSize(size, _colorSize) || format != _colorFormat || (types & ~_configuredTypes)) {
+      ok = [self configureForSize:size format:format types:(types | _configuredTypes) error:error];
+    }
+  } @catch (NSException *e) {
+    if (error) *error = BackdropError(7, [NSString stringWithFormat:@"PTEffect threw %@: %@", e.name, e.reason]);
+    ok = NO;
+  } @finally {
+    [_lock unlock];
+  }
+  return ok;
+}
+
 - (CVPixelBufferRef)renderCamera:(CVPixelBufferRef)camera
                       background:(CVPixelBufferRef)background
                             time:(double)seconds

@@ -24,14 +24,28 @@ typedef NS_ENUM(NSInteger, CutoutEngine) {
   CutoutEngineVision = 1,        // Vision's person segmentation + our Metal (VisionBackdropEngine, public API)
 };
 
+/// How far the preview has come since launch (the status line over it).
+typedef NS_ENUM(NSInteger, PreviewStage) {
+  PreviewStageStarting = 0,       // nothing shown yet: the scene is compiling, or the camera alone will show
+  PreviewStageBackground = 1,     // the background moves on its own, waiting for the camera
+  PreviewStageLoadingEffect = 2,  // the camera runs; Apple's engine is still loading
+  PreviewStageLive = 3,           // the camera's picture shows (it fades in over the background)
+};
+
 @interface Pipeline : NSObject
 
 /// Creates the effect engine and the scene renderer. Failures are reported through `engineError`
 /// and a nil `scenes`; the pipeline still works (raw camera, video or synthetic background).
 - (instancetype)init;
 
-/// The layer frames are enqueued to. Put it in a view.
+/// The layer frames are enqueued to. Put it in a view, above `introLayer`. Transparent until
+/// the camera's first frame, then it fades in.
 @property(nonatomic, readonly) AVSampleBufferDisplayLayer *displayLayer;
+/// The background alone from launch until the camera's picture has faded in over it (the intro),
+/// then empty. Put it in the view under `displayLayer`, the same size.
+@property(nonatomic, readonly) AVSampleBufferDisplayLayer *introLayer;
+/// Called on the main queue when the preview reaches a new stage.
+@property(nonatomic, copy, nullable) void (^stageHandler)(PreviewStage stage);
 /// Why Apple's Video Effects engine is unavailable (Vision does the cutout then), or nil.
 @property(nonatomic, readonly, nullable) NSString *engineError;
 /// The chosen cutout engine. Vision stands in when Apple's is unavailable, and for the rest of the
@@ -59,8 +73,12 @@ typedef NS_ENUM(NSInteger, CutoutEngine) {
 /// Called on the main queue when the effect starts failing (with the reason) or recovers (nil).
 @property(nonatomic, copy, nullable) void (^renderErrorHandler)(NSString *_Nullable message);
 
+/// Starts the intro (call once at launch, after setting the scene): the background moves on its
+/// own until the camera's picture can be shown as chosen, then that fades in over it. The
+/// camera's frames wait while the scene is still compiling or Apple's engine is still loading.
+- (void)startIntro;
 /// Asks for camera access if needed, then switches to `device` (and starts `virtualCamera`).
-/// Calls back on the main queue.
+/// Loads Apple's engine for the camera's frame size meanwhile. Calls back on the main queue.
 - (void)startCamera:(AVCaptureDevice *)device completion:(void (^)(NSError *_Nullable error))completion;
 /// Loads a looping background video; `activate` also makes it the background. Nil removes the
 /// video: while the video is the background, the camera then shows as it is.

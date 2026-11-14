@@ -9,9 +9,19 @@ struct ContentView: View {
   @Bindable var model: AppModel
 
   var body: some View {
-    PreviewView(displayLayer: model.pipeline.displayLayer, mirrored: model.mirrored) { url in
+    PreviewView(displayLayer: model.pipeline.displayLayer, introLayer: model.pipeline.introLayer, mirrored: model.mirrored) { url in
       model.setBackgroundVideo(url)
     }
+    .overlay(alignment: .bottom) {
+      if let status = model.previewStatus {
+        PreviewStatusView(status: status)
+          .frame(maxWidth: 480)  // a longer message wraps; a short one keeps its own width
+          .padding(.horizontal, 16)
+          .padding(.bottom, 28)
+          .transition(.opacity)
+      }
+    }
+    .animation(.easeInOut(duration: 0.35), value: model.previewStatus)
     .frame(minWidth: 420, minHeight: 480)
     .inspector(isPresented: $model.showSettings) {
       SettingsPanel(model: model)
@@ -39,14 +49,40 @@ struct ContentView: View {
   }
 }
 
-/// Shows the pipeline's display layer; accepts a movie file dropped on it as the background.
+/// What the preview waits for while it starts, or what keeps the camera from showing.
+struct PreviewStatusView: View {
+  let status: AppModel.PreviewStatus
+
+  var body: some View {
+    HStack(spacing: 9) {
+      if status.problem {
+        Image(systemName: "exclamationmark.triangle.fill")
+          .foregroundStyle(.yellow)
+      } else {
+        ProgressView()
+          .controlSize(.small)
+      }
+      Text(status.text)
+        .font(.callout)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .environment(\.colorScheme, .dark)  // over the video, whatever the system's appearance
+  }
+}
+
+/// Shows the pipeline's display layer over its intro layer; accepts a movie file dropped on it as
+/// the background.
 struct PreviewView: NSViewRepresentable {
   let displayLayer: AVSampleBufferDisplayLayer
+  let introLayer: AVSampleBufferDisplayLayer
   var mirrored: Bool
   var onDropVideo: @MainActor (URL) -> Void
 
   func makeNSView(context: Context) -> PreviewNSView {
-    PreviewNSView(displayLayer: displayLayer)
+    PreviewNSView(displayLayer: displayLayer, introLayer: introLayer)
   }
 
   func updateNSView(_ view: PreviewNSView, context: Context) {
@@ -56,23 +92,23 @@ struct PreviewView: NSViewRepresentable {
 }
 
 final class PreviewNSView: NSView {
-  private let displayLayer: AVSampleBufferDisplayLayer
+  private let layers: [AVSampleBufferDisplayLayer]  // the intro, then the display layer on top
   var onDropVideo: (@MainActor (URL) -> Void)?
   var mirrored = false {
     didSet {
       CATransaction.begin()
       CATransaction.setDisableActions(true)
-      displayLayer.setAffineTransform(mirrored ? CGAffineTransform(scaleX: -1, y: 1) : .identity)
+      for layer in layers { layer.setAffineTransform(mirrored ? CGAffineTransform(scaleX: -1, y: 1) : .identity) }
       CATransaction.commit()
     }
   }
 
-  init(displayLayer: AVSampleBufferDisplayLayer) {
-    self.displayLayer = displayLayer
+  init(displayLayer: AVSampleBufferDisplayLayer, introLayer: AVSampleBufferDisplayLayer) {
+    layers = [introLayer, displayLayer]
     super.init(frame: .zero)
     wantsLayer = true
     layer?.backgroundColor = NSColor.black.cgColor
-    layer?.addSublayer(displayLayer)
+    for sublayer in layers { layer?.addSublayer(sublayer) }
     registerForDraggedTypes([.fileURL])
   }
 
@@ -83,8 +119,10 @@ final class PreviewNSView: NSView {
     // bounds + position rather than frame, which is undefined while the layer is mirrored.
     CATransaction.begin()
     CATransaction.setDisableActions(true)
-    displayLayer.bounds = CGRect(origin: .zero, size: bounds.size)
-    displayLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+    for layer in layers {
+      layer.bounds = CGRect(origin: .zero, size: bounds.size)
+      layer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+    }
     CATransaction.commit()
   }
 

@@ -25,6 +25,10 @@ typedef NS_OPTIONS(uint64_t, BackdropEffects) {
 @property(atomic) int64_t quality;
 /// Studio Light strength (only used when its effect bit is on); NaN = Apple's default.
 @property(atomic) float studioLightStrength;
+/// Loads the engine for camera frames of `size` and `format` now, so that the first frame
+/// doesn't wait for it (≈ 0.2 s, seconds when its models aren't cached). Any thread; a render
+/// meanwhile waits. Frames of another size or format load it again, as without this.
+- (BOOL)prepareForSize:(CGSize)size format:(OSType)format error:(NSError **)error;
 // wantsMatte, -renderCamera:… and lastRenderMs: see BackdropRendering. The matte is Apple's
 // (+[PTEffect personSegmentationMatteFormatForColorSize:]).
 
